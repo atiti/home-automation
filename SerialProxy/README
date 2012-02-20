@@ -1,0 +1,11 @@
+=== Serial multiplexer === 
+
+The following code is a small C code, which creates 2 virtual serial ports and feeds the data to
+one physical port, and back. This was needed in order to talk to the arduino from both HeyU and boblight,
+without doing major protocol modifications to both.
+
+Use at your own risk!
+
+Contact: Attila Sukosd <attila.sukosd@gmail.com>
+License: GPL
+
