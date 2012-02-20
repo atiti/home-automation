@@ -122,6 +122,7 @@ void loop() {
       }
       nb = 0;
       state = 0;
+      break;
     case 2: // Status not implemented
       Serial.print(0x00, BYTE);
       Serial.print(0x00, BYTE);
