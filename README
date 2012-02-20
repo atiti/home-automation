@@ -1,4 +1,15 @@
-Fake CM11a firmware for Arduino to work with heyu (heyu.org)
+*** Home Automation tools ***
+
+This repo contains a collection of my home automation code. 
+
+HeyU/
+	Fake CM11a firmware for Arduino to work with heyu (heyu.org):
+	A small arduino sketch which pretends to be a CM11a device to allow remote control of lights. Tested with Sartano lights from harald-nyborg.dk
+
+AmbiLight/
+	Arduino sketch to work with boblight (http://code.google.com/p/boblight), tested with XBMC
+
 
 Contact: Attila Sukosd (attila.sukosd@gmail.com)
+License: GPL
 
