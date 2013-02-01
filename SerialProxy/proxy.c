@@ -12,12 +12,16 @@
 #include <ctype.h>
 #include <sys/time.h>
 
+#define BUFFER_SIZE 128
+
 #define AMBILIGHT 0
 #define HEYU 1
 
 #define NUM_PORTS 2
-#define REAL_PORT "/dev/ttyUSB0"
+#define REAL_PORT "/dev/ttyACM1"
 
+char *portnames[NUM_PORTS] = { "Boblight", "HeyU" };
+char portpriority[NUM_PORTS] = { 0, 1 };
 
 void print_msg(char *buff, int len) {
 	int i = 0;
@@ -33,13 +37,14 @@ void fatalErrorExit(int error, char *message) {
 }
 
 int main(int argc, char **argv) {
-	char buffer[64];
-	int buffSize = 64;
+	unsigned char buffer[BUFFER_SIZE];
+	int buffSize = BUFFER_SIZE;
 	int sps[NUM_PORTS] = {-1};
 	int active_port = 0;
 	int i = 0,rc=0, wc=0,maxfd = 0, rp;
+	int ready = 1;
 	struct termios options;
-	int flowcontrol = 0;
+	int flow_control = 0;
 
 	fd_set socks, fullsocks;
 	FD_ZERO(&fullsocks);
@@ -51,7 +56,7 @@ int main(int argc, char **argv) {
 			fatalErrorExit(errno, "cannot grant stream");
 		if (unlockpt(sps[i]) == -1)
 			fatalErrorExit(errno, "cannot unlock stream");
-		printf("Parent role: child endpoint at %s\n", ptsname(sps[i]));
+		printf("Parent role: child endpoint at %s [%s]\n", ptsname(sps[i]), portnames[i]);
 		if (sps[i] > maxfd)
 			maxfd = sps[i];
 
@@ -66,8 +71,8 @@ int main(int argc, char **argv) {
 
 	tcgetattr(rp, &options);
 
-    	cfsetispeed(&options, B57600);
-    	cfsetospeed(&options, B57600);
+    	cfsetispeed(&options, B115200);
+    	cfsetospeed(&options, B115200);
 
   	options.c_cflag |= (CLOCAL | CREAD);
 
@@ -85,27 +90,45 @@ int main(int argc, char **argv) {
 		
 		rc = select(maxfd+1, &socks, NULL, NULL, NULL);
 		if (FD_ISSET(rp, &socks)) { // Receive from the "REAL" port
-			rc = read(rp, buffer, 1);
+			rc = read(rp, buffer, buffSize);
 			if (rc > 0) {
-				if (buffer[0] == 0x55)
-					flowcontrol = 0;
-	
-				rc = write(sps[active_port], buffer, rc);
-				//printf("USB %d: ", rc);
-				//print_msg(buffer, rc);
+				printf("Received from arduino: %d bytes [%d]\n", rc, buffer[0]);
+				if (buffer[0] == 255 && rc == 1) {
+					ready = 1;
+				} else if (rc > 1) { 
+					if (buffer[rc-1] == 255) {
+						ready = 1;
+					} else {
+						ready = 0;
+					}
+					for(i=0;i<rc;i++) {
+						if (buffer[i] == 0x55) {
+							flow_control = 0;
+							printf("Found X10 termination, flow off\n");
+						}
+					}
+
+					rc = write(sps[active_port], buffer, rc-1);
+				} else {
+					ready = 0;
+				}
 			}
 		}
 		for(i=0;i<NUM_PORTS;i++) {
 			if (FD_ISSET(sps[i], &socks)) {
 				rc = read(sps[i], buffer, buffSize);
 				if (rc > 0) {
-					if (i != active_port && flowcontrol == 1) {
-						printf("Packet dropped\n");
+					if (i == active_port) {
+						printf("Flow control ON\n");
+						flow_control = 1;
+					}
+			
+					if (flow_control && i != active_port)
 						continue;
-					} else if (i == active_port)
-						flowcontrol = 1;
-					//printf("%d, %d: ", i, rc);
-					//print_msg(buffer, rc);
+
+					if (!ready) 
+						continue;
+					printf("port %d [%s], received %d, ready: %d \n", i, portnames[i], rc, ready);
 					wc = write(rp, buffer, rc);
 				}
 			}
